@@ -13,7 +13,7 @@ void displayBST(node * p)
 
         if (p) {
                 displayBST(p->left_node);
-                printf("%lu\n", p->hash);
+                printf("%s\n", p->key);
                 displayBST(p->right_node);
         }
 }
@@ -42,7 +42,9 @@ node *insertion(node * n, char * input_key, char *  input_value, kvs_key_t klen,
                 n->right_node = insertion(n->right_node, input_key, input_value, klen, vlen, hash);
         }
 
-        else {
+        else {	
+		free( n -> value);
+		n -> value = (char*) malloc(sizeof(char)*vlen);
                 strcpy(n -> value , input_value);
         }
 	//displayBST(root);
@@ -55,100 +57,57 @@ void free_func(node * n){
 	free(n -> value);
 	free(n);
 }
-	
 
-bool deletion(char * input, uint64_t hash)
-{
-	printf("deletion start\n");
-        node *parent, *child, *p, *suc, *suc_p;
-        parent = NULL;
-        p = root;
-	
-        while ((p != NULL) && (p-> hash != hash)) {
-                parent = p;
-                if (hash < p->hash) {
-                        p = p->left_node;
-                }
-
-                else {
-                        p = p->right_node;
-                }
-        }
-        if (p == NULL) {
-                return false;
-        }
-
-        if ((p->left_node == NULL) && (p->right_node == NULL)) {
-                if (parent != NULL) {
-                        if (parent->left_node == p) {
-                                parent->left_node = NULL;
-                        } else
-                                parent->right_node = NULL;
-                } else {
-                        printf("free function will function 4\n");
-		       	free_func(root);
-                        root = NULL;
-			return true;
-                }
-		printf("free function will function 5\n");
-                free_func(p);
-		return true;
-        }
-
-        else if ((p->left_node == NULL) || (p->right_node == NULL)) {
-                if (p->left_node != NULL) {
-                        child = p->left_node;
-                } else
-                        child = p->right_node;
-
-                if (parent == NULL) {
-                        p = child;
-			printf("free_func will function\n");
-                        free_func(root);
-			printf("Double free?\n");
-                        root = p;
-			displayBST(root);
-		        printf("\n");
-			printf("return true");
-			return true;
-                } else {
-                        if (parent->left_node == p) {
-				printf("hiii\n");
-                                parent->left_node = child;
-                        } else {
-				printf("iiiih\n");
-                                parent->right_node = child;
-			}
-
-                }
-		printf("free function will function 3\n");
-                free_func(p);
-		return true;
-        } else {
-                suc_p = p;
-                suc = p->left_node;
-
-                while (suc->right_node != NULL) {
-                        suc_p = suc;
-                        suc = suc->right_node;
-                }
-
-                if (suc_p->left_node == suc) {
-                        suc_p->left_node = suc->left_node;
-                } else {
-                        suc_p->right_node = suc->left_node;
-		}
-                p->value = suc->value;
-                p = suc;
-		printf("free function will function 2\n");
-                printf("%lu\n\n", p -> hash);
-		free_func(p);
-		displayBST(root);
-                printf("\n");
-		printf("\n%lu\n", p -> 
-		return true;
-        }
+node * findmin(node *input){
+	node *min = input;
+	while(min->left_node != NULL){
+		min= min -> left_node;
+	}
+	return min;
 }
+
+node * deletion(node *Node, uint64_t hash, bool *success, bool pass = false)
+{	
+	//displayBST(root);
+	//printf("\n");
+	
+	node* n = NULL;
+	if(Node == NULL){
+		return NULL;
+	}
+
+	if (Node -> hash > hash){
+		Node -> left_node = deletion( Node -> left_node, hash, success, pass);
+	}
+	else if (Node -> hash < hash){
+		Node -> right_node = deletion( Node -> right_node, hash, success, pass );
+	}
+	else {
+		if (Node -> right_node != NULL && Node -> left_node != NULL)
+		{
+			n = findmin(Node -> right_node);
+			Node -> hash = n -> hash;
+			free(Node->key);
+			free(Node -> value);
+			Node -> key = n -> key;
+			Node -> value = n -> value;
+			Node -> right_node = deletion(Node -> right_node, n -> hash , success, true);
+		}
+		else{
+			n = (Node -> left_node == NULL) ? Node -> right_node : Node -> left_node; 
+			if (pass){
+				free(Node);
+			}
+			else{	
+				free_func(Node);
+			}
+			*success = true;
+			return n;
+		}
+	}
+	return Node;
+}
+
 
 
 node *search_by_key(node * root, char * key, uint64_t hash)
@@ -209,13 +168,12 @@ int my_kvs_get (struct my_kvs *my_kvs, struct kvs_key *key, struct kvs_value *va
 int my_kvs_del (struct my_kvs *my_kvs, struct kvs_key *key, struct kvs_context *ctx) {
 	uint64_t hash;
         hash = XXH64(key -> key, key -> klen, 0);
-
-	if (deletion (key -> key, hash)){
+	bool success = false;
+	root = deletion(root, hash, &success, false );
+	if (success == true){
 		return 0;
 	} else {
 		return -1;
 	}
 	
 }
-
-
